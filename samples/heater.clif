@@ -1,0 +1,96 @@
+#include <clif.h>
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int heater=1;
+
+int quit(clif_keyword *w, const unsigned int t)
+{
+	return CLIF_PARSE_EOF;
+}
+
+int help(clif_keyword *w, const unsigned int t)
+{
+    printf("heater       <on/1|off/0>\n");
+    printf("temperature  <temperature>\n");
+    printf("help\n");
+    printf("quit\n");
+
+    return CLIF_PARSE_SUCCESS;
+}
+
+int get_heater(clif_keyword *w, const unsigned int t)
+{
+    printf("Heater is %s!\n", (heater?"on":"off"));
+    return CLIF_PARSE_SUCCESS;
+}
+
+int set_heater(clif_keyword *w, const unsigned int t)
+{
+    heater = (!strcmp(w->command, "on") || !strcmp(w->command, "1"));
+    return get_heater(w, t);
+}
+
+int temperature=25;
+
+int get_temperature(clif_keyword *w, const unsigned int t)
+{
+	printf("Temperature target is %d\n", temperature);
+	return CLIF_PARSE_SUCCESS;
+}
+
+int set_temperature(clif_keyword *w, const unsigned int t)
+{
+	temperature = atoi(clif_token_get(t));
+	return get_temperature(w, t);
+}
+
+
+int main(int argc, char *argv[])
+{
+	int error;
+	clif_grammar on_off, thermostat;
+
+    %{
+	$on_off =
+	{
+	    "on" -> set_heater;
+	    "1" -> set_heater;
+	    "off" -> set_heater;
+	    "0" -> set_heater;
+	}
+
+	$thermostat =
+	{
+	    "heater" -> get_heater
+	    {
+		$on_off;
+	    }    
+	    "temperature" -> get_temperature
+	    {
+		"%d" -> set_temperature;
+	    }
+	   "quit" -> quit;
+	   "help" -> help;
+	}
+    %}
+
+	clif_prompt_set("thermostat# ");
+
+	init_signal_handler();
+
+	while((error = clif_readline(thermostat)) != CLIF_PARSE_EOF)
+	{
+		if (error < 0)
+		{
+			printf("%s\n\n", clif_parse_error(error));
+		}
+	}
+	printf("\n");
+
+	return EXIT_SUCCESS;
+}
+

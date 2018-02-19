@@ -1,0 +1,126 @@
+CC=gcc
+YACC=bison
+LEX=flex
+RM=rm -f
+CP=cp
+
+BIN=bin
+SRC=src
+INC=inc
+LIB=lib/arm
+OBJ=obj
+TMP=tmp
+SAMPLE=samples
+ROOT=/usr/
+
+VIM_VERSION=vim74
+
+CFLAGS_DEBUG=-I $(INC) -Wall -g -DDEBUG_LEVEL=4 -Wno-unused-function
+CFLAGS_RELEASE=-I $(INC) -Wall -O2 -DNDEBUG=1 -Wno-unused-function
+CFLAGS_LIBRARY=-fPIC
+
+LDFLAGS_DEBUG=
+LDFLAGS_RELEASE=-s
+LDFLAGS_LIBRARY=-shared
+
+OBJECTS_LIBDEBUG=$(OBJ)/clif_invite-debug.o $(OBJ)/clif_parser-debug.o $(OBJ)/debug-debug.o $(OBJ)/strcmpf-debug.o $(OBJ)/clif_token-debug.o $(OBJ)/clif_readline-debug.o $(OBJ)/clif_signal-debug.o
+OBJECTS_LIBRELEASE=$(OBJ)/clif_invite.o $(OBJ)/clif_parser.o $(OBJ)/strcmpf.o $(OBJ)/clif_token.o $(OBJ)/clif_readline.o $(OBJ)/clif_signal.o
+OBJECTS_COMPILER=$(OBJ)/clif_compiler.tab.o $(OBJ)/clif_compiler.yy.o
+OBJECTS_SAMPLE1=$(SAMPLE)/sample-heater.o
+OBJECTS_SAMPLE2=$(SAMPLE)/sample-modes.o
+OBJECTS_SAMPLE3=$(SAMPLE)/sample-config.o
+
+TARGET_LIBDEBUG=$(LIB)/libclif-debug.so
+TARGET_LIBRELEASE=$(LIB)/libclif.so
+TARGET_COMPILER=$(BIN)/clif
+TARGET_SAMPLE1=$(SAMPLE)/heater
+TARGET_SAMPLE_DEBUG1=$(SAMPLE)/heater-debug
+TARGET_SAMPLE2=$(SAMPLE)/modes
+TARGET_SAMPLE_DEBUG2=$(SAMPLE)/modes-debug
+TARGET_SAMPLE3=$(SAMPLE)/config
+TARGET_SAMPLE_DEBUG3=$(SAMPLE)/config-debug
+
+.PHONY: all clean sourceclean distclean library_debug library_release compiler samples samples_debug install syntax_vim
+
+all: library_release compiler
+
+library_debug: $(TARGET_LIBDEBUG)
+library_release: $(TARGET_LIBRELEASE)
+compiler: $(TARGET_COMPILER)
+samples: $(TARGET_SAMPLE1) $(TARGET_SAMPLE2) $(TARGET_SAMPLE3)
+samples_debug: $(TARGET_SAMPLE_DEBUG1) $(TARGET_SAMPLE_DEBUG2) $(TARGET_SAMPLE_DEBUG3)
+
+$(TARGET_LIBDEBUG): $(OBJECTS_LIBDEBUG)
+	$(CC) -o $@ $(LDFLAGS_DEBUG) $(LDFLAGS_LIBRARY) $^ \
+	$(info ***************************************************************)
+	$(info To run with debug library: export LD_LIBRARY_PATH=$(LIB))
+	$(info ***************************************************************)
+
+$(TARGET_LIBRELEASE): $(OBJECTS_LIBRELEASE)
+	$(CC) -o $@ $(LDFLAGS_RELEASE) $(LDFLAGS_LIBRARY) $^
+
+$(TARGET_COMPILER): $(TMP)/clif_compiler.tab.c $(TMP)/clif_compiler.yy.c
+	$(CC) -o $@ $(CFLAGS_RELEASE) $^ -L$(LIB) -lfl
+
+$(TARGET_SAMPLE1): $(OBJECTS_SAMPLE1) $(TARGET_LIBRELEASE)
+	$(CC) -o $@ $(LDFLAGS_DEBUG) $(OBJECTS_SAMPLE1) -L$(LIB) -lclif -lreadline
+
+$(TARGET_SAMPLE_DEBUG1): $(OBJECTS_SAMPLE1) $(TARGET_LIBDEBUG)
+	$(CC) -o $@ $(LDFLAGS_RELEASE) $(OBJECTS_SAMPLE1) -L$(LIB) -lclif-debug -lreadline
+	
+$(TARGET_SAMPLE2): $(OBJECTS_SAMPLE2) $(TARGET_LIBRELEASE)
+	$(CC) -o $@ $(LDFLAGS_DEBUG) $(OBJECTS_SAMPLE2) -L$(LIB) -lclif -lreadline
+
+$(TARGET_SAMPLE_DEBUG2): $(OBJECTS_SAMPLE2) $(TARGET_LIBDEBUG)
+	$(CC) -o $@ $(LDFLAGS_RELEASE) $(OBJECTS_SAMPLE2) -L$(LIB) -lclif-debug -lreadline
+
+$(TARGET_SAMPLE3): $(OBJECTS_SAMPLE3) $(TARGET_LIBRELEASE)
+	$(CC) -o $@ $(LDFLAGS_DEBUG) $(OBJECTS_SAMPLE3) -L$(LIB) -lclif -lreadline
+
+$(TARGET_SAMPLE_DEBUG3): $(OBJECTS_SAMPLE3) $(TARGET_LIBDEBUG)
+	$(CC) -o $@ $(LDFLAGS_RELEASE) $(OBJECTS_SAMPLE3) -L$(LIB) -lclif-debug -lreadline
+
+$(OBJ)/%.o: $(SRC)/%.c
+	$(CC) -o $@ $(CFLAGS_RELEASE) $(CFLAGS_LIBRARY) -c $^
+
+$(OBJ)/%-debug.o: $(SRC)/%.c
+	$(CC) -o $@ $(CFLAGS_DEBUG) $(CFLAGS_LIBRARY) -c $^
+
+$(TMP)/clif_compiler.tab.c: $(SRC)/clif_compiler.y
+	$(YACC) -o$@ -d $^
+
+$(TMP)/clif_compiler.yy.c: $(SRC)/clif_compiler.l
+	$(LEX) -o$@ $^
+
+$(TMP)/sample-%.c: $(SAMPLE)/%.clif $(TARGET_COMPILER)
+	$(TARGET_COMPILER) -o $@ $<
+
+$(SAMPLE)/sample-%.o: $(TMP)/sample-%.c
+	$(CC) -o $@ $(CFLAGS_DEBUG) -c $^
+	
+clean:
+	$(RM) $(OBJECTS_LIBDEBUG) $(OBJECTS_LIBRELEASE) $(OBJECTS_COMPILER) $(OBJECTS_SAMPLE1) $(OBJECTS_SAMPLE2)
+
+sourceclean:
+	$(RM) $(TMP)/clif_compiler.yy.c $(TMP)/clif_compiler.tab.c $(TMP)/clif_compiler.tab.h $(TMP)/sample-header.c $(TMP)/sample-modes.c $(TMP)/sample-config.c
+
+distclean: clean sourceclean
+	$(RM) $(TARGET_LIBDEBUG) $(TARGET_LIBRELEASE) $(TARGET_COMPILER) $(TARGET_SAMPLE1) $(TARGET_SAMPLE2) $(TARGET_SAMPLE3) $(TARGET_SAMPLE_DEBUG1) $(TARGET_SAMPLE_DEBUG2) $(TARGET_SAMPLE_DEBUG3)
+
+
+install: $(ROOT)bin/clif $(ROOT)lib/libclif.so $(ROOT)include/clif.h
+
+$(ROOT)bin/clif: $(TARGET_COMPILER)
+	$(CP) $^ $@
+
+$(ROOT)lib/libclif.so: $(TARGET_LIBRELEASE)
+	$(CP) $^ $@
+
+$(ROOT)include/clif.h: inc/clif.h
+	$(CP) $^ $@
+
+syntax_vim: /usr/share/vim/$(VIM_VERSION)/syntax/clif.vim
+
+/usr/share/vim/$(VIM_VERSION)/syntax/clif.vim: syntax/clif.vim
+	$(CP) $^ $@
+

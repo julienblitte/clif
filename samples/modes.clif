@@ -1,0 +1,258 @@
+#include <clif.h>
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define DEFAULT_PASSWORD	"1234"
+
+typedef enum _mode_type
+{
+    external_mode=0,
+    loggedin_mode=1,
+    view_mode=2,
+    config_mode=3,
+    factory_mode=4
+} mode_type;
+
+static mode_type current_mode;
+
+const char *prompts[5]=
+{
+    "(not-logged)> ",
+    "> ",
+    "(view)# ",
+    "(configure)# ",
+    "(FACTORY)# "
+};
+
+float firmware_version;
+char *password;
+
+void update_mode(mode_type mode)
+{
+	current_mode = mode;
+	clif_prompt_set(prompts[(int)mode]);
+}
+
+int help(clif_keyword *w, const unsigned int t)
+{
+    switch(current_mode)
+    {
+        case factory_mode:
+            printf("firmware upgrade <filename> - start firmware upgrade\n");
+            printf("clear                       - clear all appliance configuration\n");
+        case config_mode:
+            printf("interface <0-9>             - configuration of interface\n");
+        case view_mode:
+            printf("show                        - display configuration\n");
+            printf("restart                     - restart appliance\n");
+        case loggedin_mode:
+            printf("password change <password>  - update password\n");
+            printf("password reset              - reset password to '1234'\n");
+            printf("info                        - display general information\n");
+            printf("status                      - display status\n");
+            printf("mode factory                - switch to factory mode\n");
+            printf("mode view                   - switch to view mode\n");
+            printf("mode configure              - switch to configure mode\n");
+            break;
+
+        case external_mode:
+            printf("login <password>\n");
+            break;
+    }
+    printf("help\n");
+    printf("quit\n");
+    return CLIF_PARSE_SUCCESS;
+}
+
+int quit(clif_keyword *w, const unsigned int t)
+{
+	return CLIF_PARSE_EOF;
+}
+
+int mode_configure(clif_keyword *w, const unsigned int t)
+{
+	update_mode(config_mode);
+	printf("You are now in configuration mode\n");
+	return CLIF_PARSE_SUCCESS;
+}
+
+int mode_factory(clif_keyword *w, const unsigned int t)
+{
+	update_mode(factory_mode);
+	printf("WARNINGL: Be careful, factory mode is now active.\n");
+	return CLIF_PARSE_SUCCESS;
+}
+
+int show(clif_keyword *w, const unsigned int t)
+{
+	printf("#Configuration:\nConsole: enabled_mode\nAccess type: secured\nInterface type: console\n");
+	return CLIF_PARSE_SUCCESS;
+}
+
+int info(clif_keyword *w, const unsigned int t)
+{
+	printf("Machine is virtual.\nFirmware version is %.2f\nRelease date 2017-06-01.\nSerial number: 0001-0001-0001.\n", firmware_version);
+	return CLIF_PARSE_SUCCESS;
+}
+
+int status(clif_keyword *w, const unsigned int t)
+{
+	printf("Status is: active.\n");
+	return CLIF_PARSE_SUCCESS;
+}
+
+int restart(clif_keyword *w, const unsigned int t)
+{
+	printf("Rebooting appliance...\n");
+	fflush(stdout); sleep(2);
+	update_mode(external_mode);
+
+	return CLIF_PARSE_SUCCESS;
+}
+
+int interface(clif_keyword *w, const unsigned int t)
+{
+	printf("Configuration of interface %s\n", clif_token_get(t));
+	printf("Interface is in readonly mode (virtual).\n");
+	return CLIF_PARSE_SUCCESS;
+}
+
+int upgrade(clif_keyword *w, const unsigned int t)
+{
+	firmware_version = clif_token_float(t);
+	printf("Upgrading to firmware %.2f...\n", firmware_version);
+	fflush(stdout); sleep(2);
+	printf("New firmware deployed: %.2f\n", firmware_version);
+	return CLIF_PARSE_SUCCESS;
+}
+
+int clear(clif_keyword *w, const unsigned int t)
+{
+	printf("Clearing configuration...\n");
+	fflush(stdout); sleep(2);
+	printf("Configuration cleared!\n");
+	return CLIF_PARSE_SUCCESS;
+}
+
+int password_change(clif_keyword *w, const unsigned int t)
+{
+	free(password);
+	password = strdup(clif_token_str_default(t, DEFAULT_PASSWORD));
+	printf("Password updated to: %s\n", password);
+	
+	return CLIF_PARSE_SUCCESS;
+}
+
+int login(clif_keyword *w, const unsigned int t)
+{
+	if (strcmp(clif_token_get(1), password) != 0)
+	{
+		printf("Invalid password (default: %s)!\n", DEFAULT_PASSWORD);
+	}
+	else
+	{
+		update_mode(loggedin_mode);
+	}
+	return CLIF_PARSE_SUCCESS;
+}
+
+int mode_view(clif_keyword *w, const unsigned int t)
+{
+	update_mode(view_mode);
+	return CLIF_PARSE_SUCCESS;
+}
+
+int main(int argc, char *argv[])
+{
+	int error;
+	clif_grammar external, loggedin, view, config, factory;
+	clif_grammar *modes[5];
+
+    %{
+        $external = 
+        {
+            "login"
+            {
+                "%s" -> login;
+            }
+            "help" -> help;
+            "quit" -> quit;
+        }
+        $loggedin =
+        {
+	    "mode"
+	    {
+		"view" -> mode_view;
+		"configure" -> mode_configure;
+		"factory" -> mode_factory;
+	    }
+            "info" -> info;
+            "status" -> status;
+	    "password"
+	    {
+		"change"
+		{
+		    "%s" -> password_change;
+		}
+		"reset" -> password_change;
+	    }
+            "help" -> help;
+            "quit" -> quit;
+        }
+        $view =
+        {
+            "show" -> show;
+            "restart" -> restart;
+            $loggedin;
+        }
+        $config =
+        {
+            "interface"
+            {
+                "%d" -> interface;
+            }
+            $view;
+        }
+        $factory =
+        {
+            "firmware"
+            {
+                "upgrade"
+                {
+                    "%s" -> upgrade;
+                }
+	    }
+            "clear" -> clear;
+	    $config;
+        }
+    %}
+
+	modes[0] = &external;
+	modes[1] = &loggedin;
+	modes[2] = &view;
+	modes[3] = &config;
+	modes[4] = &factory;
+
+	update_mode(external_mode);
+
+	firmware_version = 1.0;
+	password = strdup(DEFAULT_PASSWORD);
+
+	init_signal_handler();
+
+	while((error = clif_readline(*modes[(int)current_mode])) != CLIF_PARSE_EOF)
+	{
+		if (error < 0)
+		{
+			printf("%s\n\n", clif_parse_error(error));
+		}
+	}
+	printf("\n");
+
+	return EXIT_SUCCESS;
+}
+

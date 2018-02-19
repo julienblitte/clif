@@ -1,0 +1,111 @@
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <clif.h>
+
+#define DEFAULT_NAME      "no_name"
+#define DEFAULT_PHONE     "no_phone"
+#define DEFAULT_PARAMETER "no_parameter"
+#define DEFAULT_VARIABLE  "no_number"
+
+#define CONFIGURATION_FILE "sample.conf"
+
+static char *name, *phone, *parameter, *variable;
+
+bool generate_config()
+{
+	FILE *f;
+	f = fopen(CONFIGURATION_FILE, "wt");
+	if (f)
+	{
+		fprintf(f, "name Julien\n"
+			"phone 1234567\n"
+			"\n"
+			"parameter myValue\n"
+			"variable abcdef\n"
+			);
+		fclose(f);
+		return true;
+	}
+	return false;
+}
+
+int set_name(clif_keyword *w, const unsigned int t)
+{
+	free(name);
+	name = strdup(clif_token_str(t));
+	return CLIF_PARSE_SUCCESS;
+}
+int set_phone(clif_keyword *w, const unsigned int t)
+{
+	free(phone);
+	phone = strdup(clif_token_str(t));
+	return CLIF_PARSE_SUCCESS;
+}
+int set_parameter(clif_keyword *w, const unsigned int t)
+{
+	free(parameter);
+	parameter = strdup(clif_token_str(t));
+	return CLIF_PARSE_SUCCESS;
+}
+int set_variable(clif_keyword *w, const unsigned int t)
+{
+	free(variable);
+	variable = strdup(clif_token_str(t));
+	return CLIF_PARSE_SUCCESS;
+}
+
+int main()
+{
+	FILE *f;
+	int error;
+
+	name = strdup(DEFAULT_NAME);
+	phone = strdup(DEFAULT_PHONE);
+	parameter = strdup(DEFAULT_PARAMETER);
+	variable = strdup(DEFAULT_VARIABLE);
+	
+	clif_grammar config;
+	%{
+		$config = {
+			"name" { "%s" -> set_name; }
+			"phone" { "%s" -> set_phone; }
+			"parameter" { "%s" -> set_parameter; }
+			"variable" { "%s" -> set_variable; }
+		}
+	%}
+
+	if (!generate_config())
+	{
+		perror("Unable to generate configuration file");
+		exit(EXIT_FAILURE);
+	}
+
+	f = fopen(CONFIGURATION_FILE, "rt");
+	if (!f)
+	{
+		perror("Unable to read configuration file");
+		exit(EXIT_FAILURE);
+	}
+	while((error = clif_fgets(config, f)) != CLIF_PARSE_EOF)
+	{
+		if (error < 0)
+		{
+			printf("%s\n\n", clif_parse_error(error));
+		}
+	}
+	fclose(f);
+
+	printf("Name:      '%s'\n", name);
+	printf("Phone:     '%s'\n", phone);
+	printf("Parameter: '%s'\n", parameter);
+	printf("Variable:  '%s'\n", variable);
+
+	free(name);
+	free(phone);
+	free(parameter);
+	free(variable);
+
+	return EXIT_SUCCESS;
+}

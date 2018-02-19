@@ -1,0 +1,9 @@
+tmp
+bin
+*.o
+lib/arm/libclif.so
+lib/w32/libclif.a
+samples/heater
+samples/modes
+samples/config
+Makefile

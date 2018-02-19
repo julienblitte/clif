@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="clif" />
+		<Option makefile_is_custom="1" />
+		<Option pch_mode="2" />
+		<Build>
+			<Target title="library_debug"/>
+			<Target title="library_release"/>
+			<Target title="compiler"/>
+			<Target title="samples"/>
+			<Target title="samples_debug"/>
+			<Target title="clean"/>
+			<Target title="sourceclean"/>
+			<Target title="distclean"/>
+		</Build>
+		<Unit filename="inc/clif.h" />
+		<Unit filename="inc/strcmpf.h" />
+		<Unit filename="inc/clif_private.h" />
+		<Unit filename="inc/debug.h" />
+		<Unit filename="src/clif_compiler.l" />
+		<Unit filename="src/clif_compiler.y" />
+		<Unit filename="src/clif_invite.c" />
+		<Unit filename="src/clif_parser.c" />
+		<Unit filename="src/debug.c" />
+		<Unit filename="src/strcmpf.c" />
+		<Unit filename="samples/heater.clif" />
+		<Unit filename="samples/modes.clif" />
+	</Project>
+</CodeBlocks_project_file>
